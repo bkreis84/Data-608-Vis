@@ -1,0 +1,116 @@
+---
+title: "Data 608 - HW #1"
+author: "Brian Kreis"
+date: "September 9, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+I have provided you with data about the 5,000 fastest growing companies in the US, as compiled by Inc. magazine. Please use the data available at 
+
+https://github.com/charleyferrari/CUNY_DATA608/tree/master/lecture1/Data 
+ 
+●	This assignment must be done in a single R script with ggplot2. Use of dplyr or plyr is encouraged but not required. 
+●	Images for question ‘x’ must be saved to the lecture1 directory as ‘FigureX.jpg’ or ‘FigureX.png’ (ie for Question 1, Figure1.jpg, etc). 
+
+
+1.	Create a graph that shows the distribution of companies in the dataset by State (ie how many are in each state). There are a lot of States, so consider which axis you should use assuming I am using a ‘portrait’ oriented screen (ie taller than wide). 
+
+```{r fig.width=10,fig.height=11}
+
+library(ggplot2)
+library(dplyr)
+library(Hmisc)
+
+
+data <- read.csv('https://raw.githubusercontent.com/charleyferrari/CUNY_DATA608/master/lecture1/Data/inc5000_data.csv', header = TRUE)
+
+stCnt <- data %>% count(State) %>% arrange(desc(n))
+
+stCnt <- stCnt %>%  mutate(quant = cut2(stCnt$n,quantile(stCnt$n, include.lowest=TRUE)))
+
+
+# https://stackoverflow.com/questions/11728419/using-cut-and-quartile-to-generate-breaks-in-r-function
+
+
+
+ggplot(stCnt, aes(x = reorder(State, n), y = n)) + 
+  geom_bar(aes(fill = quant), color="black", stat = "identity") + 
+  coord_flip() +
+  ggtitle("States with the Fastest Growing Companies") +
+  labs(y= NULL, x = NULL) +
+  scale_fill_discrete(name = "Quantile Groups") +
+  theme(legend.position="bottom")
+```
+
+2.	Let’s dig in on the State with the 3rd most companies in the data set. Imagine you work for the state and are interested in how many people are employed by companies in different industries employ. Create a plot of average employment by industry for companies in this state (only use cases with full data (user R’s complete.cases() function). Your graph should show how variable the ranges are, and exclude outliers. 
+
+
+```{r fig.width=10,fig.height=11}
+stCnt$State[3]
+
+#https://stackoverflow.com/questions/28687515/search-for-and-remove-outliers-from-a-dataframe-grouped-by-a-variable
+
+
+ny <- data %>% 
+  mutate(cases = complete.cases(data)) %>% 
+  filter(cases=="TRUE") %>% 
+  filter(State == "NY") %>%
+  #looks to see if values are more than 2 standard deviations from the mean. 
+  filter(!(abs(Employees - mean(Employees)) > 2*sd(Employees))) %>%
+  group_by(Industry)%>%
+  #Find the mean and standard error
+  summarise(mean = mean(Employees), 
+            n = length(Industry),
+            se = sd(Employees)/sqrt(n))
+
+
+
+# Take a look at the outliers we eliminated
+test <- data %>%
+  mutate(cases = complete.cases(data)) %>% 
+  filter(cases=="TRUE") %>% 
+  filter(State == "NY") %>%
+  arrange(desc(Employees))
+
+
+ggplot(ny, aes(x = reorder(Industry, mean), y = mean)) + 
+  geom_bar(aes(fill = Industry), color="black", stat = "identity") + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.6) +
+  ggtitle("Average # of Employees per Company by Industry") +
+  labs(y= NULL, x = NULL) +
+  guides(fill=FALSE) +
+  coord_flip()
+```
+
+
+3.	Now imagine you work for an investor and want to see which industries generate the most revenue per employee. Create a chart makes this information clear. 
+
+```{r fig.width=10,fig.height=11}
+rev <- data %>% 
+  mutate(cases = complete.cases(data)) %>% 
+  filter(cases=="TRUE") %>% 
+  mutate(rev_emp = Revenue/Employees) %>%
+  #looks to see if values are more than 2 standard deviations from the mean. 
+  filter(!(abs(rev_emp - mean(rev_emp)) > 2*sd(rev_emp))) %>%
+  group_by(Industry)%>%
+  #Find the mean and standard error
+  summarise(Revenue_Employee = sum(Revenue)/sum(Employees),
+            n = length(Industry),
+            se = sd(Revenue/Employees)/sqrt(n))
+
+
+ggplot(rev, aes(x = reorder(Industry, Revenue_Employee), y = Revenue_Employee)) + 
+  geom_bar(aes(fill = Industry), color="black", stat = "identity") + 
+  geom_errorbar(aes(ymin=Revenue_Employee-se, ymax=Revenue_Employee+se), width=0.6) +
+  ggtitle("Average Revenue per Employee by Industry") +
+  labs(y= NULL, x = NULL) +
+  guides(fill=FALSE) +
+  scale_y_continuous(labels = scales::comma) +
+  coord_flip() 
+
+```
+
